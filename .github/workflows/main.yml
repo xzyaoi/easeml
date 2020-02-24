@@ -1,0 +1,67 @@
+name: TestBuildPublish
+on: 
+    push:
+      branches:
+            - workflow
+env:
+    CI: true
+    TERM: xterm
+
+
+
+jobs:
+    prepare:
+        services:
+          mongodb:
+            image: mongo:3.4.23
+            ports:
+              - 27017:27017
+        runs-on: ubuntu-latest
+        strategy:
+          matrix:
+            node-version: [12.x]
+
+        steps:
+            - name: Set up Go 1.13
+              uses: actions/setup-go@v1
+              with:
+                go-version: 1.13
+              id: go
+              
+            - name: Use Node.js ${{ matrix.node-version }}
+              uses: actions/setup-node@v1
+              with:
+                node-version: ${{ matrix.node-version }}
+                
+            - name: Set up Python
+              uses: actions/setup-python@v1
+              with:
+                python-version: '3.x'              
+
+            - name: Check out code into the Go module directory
+              uses: actions/checkout@v2
+
+            - name: Get dependencies (gobuffalo)
+              run: |
+                go get -v -u github.com/gobuffalo/packr/v2/... 
+                echo ::set-output name=status::success
+              continue-on-error: true
+                        
+            - name: Other Dependencies
+              run: |
+                  python -m pip install --upgrade pip setuptools wheel
+                  pip install pipenv numpy
+                  cd client/javascript/easemlclient && npm install
+  
+            - name: Test
+              run: |
+                make test
+                echo ::set-output name=status::success
+              continue-on-error: true
+
+            - name: Build
+              run: make build
+
+            - name: Publish
+              run: make publish
+      
